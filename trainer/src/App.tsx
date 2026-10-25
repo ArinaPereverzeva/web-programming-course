@@ -1,7 +1,12 @@
+import "./App.css";
+
 import TaskCard from "./TaskCard";
 import TaskList from "./TaskList";
 
 import { useState } from "react";
+
+import type { Answer } from "./domain";
+import { calculateProgress, findTaskById } from "./domain";
 import { trainingSet } from "./trainingData";
 
 export default function App() {
@@ -9,25 +14,185 @@ export default function App() {
         trainingSet.tasks[0]?.id ?? null
     );
 
-    const selectedTask = trainingSet.tasks.find(
+    const [answers, setAnswers] = useState<Answer[]>([]);
+
+    const [submitted, setSubmitted] = useState(false);
+
+    const progress = calculateProgress(trainingSet, answers);
+
+    const unansweredTasks = trainingSet.tasks.filter((task) => {
+        const answer = answers.find((answer) => answer.taskId === task.id);
+
+        if (!answer) return true;
+
+        if (answer.kind === "short-text") {
+            return answer.text.trim().length === 0;
+        }
+
+        return false;
+    });
+
+    const selectedTask = selectedTaskId
+        ? findTaskById(trainingSet, selectedTaskId)
+        : undefined;
+
+    const selectedTaskIndex = trainingSet.tasks.findIndex(
         (task) => task.id === selectedTaskId
     );
 
     return (
         <main>
-            <h1>{trainingSet.title}</h1>
-            <p>Всего заданий: {trainingSet.tasks.length}</p>
+            {submitted ? (
+                <section>
+                    <h2>Попытка завершена</h2>
+                    <p>
+                        Результат: {progress.completed} из {progress.total}
+                    </p>
 
-            <h2>Список заданий</h2>
+                    <h2>Ответы:</h2>
 
-            <TaskList tasks={trainingSet.tasks} onSelect={setSelectedTaskId} />
+                    {trainingSet.tasks.map((task) => {
+                        const answer = answers.find(
+                            (answer) => answer.taskId === task.id
+                        );
 
-            {selectedTask ? (
-                <TaskCard task={selectedTask} />
-            ) : trainingSet.tasks.length === 0 ? (
-                <p>В наборе нет заданий.</p>
+                        return (
+                            <section key={task.id}>
+                                <h3>{task.prompt}</h3>
+
+                                {task.kind === "single-choice" ? (
+                                    <p>
+                                        {" "}
+                                        {answer?.kind === "single-choice"
+                                            ? task.options.find(
+                                                (option) =>
+                                                    option.id === answer.optionId
+                                            )?.label ?? "Нет ответа"
+                                            : "Нет ответа"}
+                                    </p>
+                                ) : (
+                                    <p>
+                                        {" "}
+                                        {answer?.kind === "short-text" &&
+                                            answer.text.trim().length > 0
+                                            ? answer.text
+                                            : "Нет ответа"}
+                                    </p>
+                                )}
+                            </section>
+                        );
+                    })}
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setAnswers([]);
+                            setSubmitted(false);
+                            setSelectedTaskId(trainingSet.tasks[0]?.id ?? null);
+                        }}
+                    >
+                        Начать новую попытку
+                    </button>
+                </section>
             ) : (
-                <p>Задание не найдено. Выберите другое из списка.</p>
+                <>
+                    <h1>{trainingSet.title}</h1>
+                    <p>Всего заданий: {trainingSet.tasks.length}</p>
+
+                    <p>
+                        Прогресс: {progress.completed} из {progress.total}
+                    </p>
+
+                    <h2>Неотвеченные задания: {unansweredTasks.length}</h2>
+
+                    {unansweredTasks.length > 0 ? (
+                        <ul>
+                            {unansweredTasks.map((task) => (
+                                <li key={task.id}>{task.prompt}</li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <p>Все задания выполнены.</p>
+                    )}
+
+                    <h2>Список заданий</h2>
+
+                    <TaskList tasks={trainingSet.tasks} onSelect={setSelectedTaskId} />
+
+                    {selectedTask ? (
+                        <>
+                            <TaskCard
+                                task={selectedTask}
+                                disabled={submitted}
+                                answer={answers.find((answer) => answer.taskId === selectedTask.id)}
+                                onAnswerChange={(newAnswer) => {
+                                    setAnswers((previousAnswers) => {
+                                        const existingAnswer = previousAnswers.find(
+                                            (answer) => answer.taskId === newAnswer.taskId
+                                        );
+
+                                        if (existingAnswer) {
+                                            return previousAnswers.map((answer) =>
+                                                answer.taskId === newAnswer.taskId ? newAnswer : answer
+                                            );
+                                        }
+
+                                        return [...previousAnswers, newAnswer];
+                                    });
+                                }}
+                            />
+                            <div>
+                                <button
+                                    type="button"
+                                    disabled={selectedTaskIndex <= 0}
+                                    onClick={() => {
+                                        const previousTask = trainingSet.tasks[selectedTaskIndex - 1];
+                                        if (previousTask) {
+                                            setSelectedTaskId(previousTask.id);
+                                        }
+                                    }}
+                                >
+                                    Предыдущее
+                                </button>
+
+                                <button
+                                    type="button"
+                                    disabled={selectedTaskIndex >= trainingSet.tasks.length - 1}
+                                    onClick={() => {
+                                        const nextTask = trainingSet.tasks[selectedTaskIndex + 1];
+                                        if (nextTask) {
+                                            setSelectedTaskId(nextTask.id);
+                                        }
+                                    }}
+                                >
+                                    Следующее
+                                </button>
+                            </div>
+
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (unansweredTasks.length > 0) {
+                                        const confirmed = window.confirm(
+                                            `Осталось неотвеченных заданий: ${unansweredTasks.length}. Завершить попытку?`
+                                        );
+
+                                        if (!confirmed) return;
+                                    }
+
+                                    setSubmitted(true);
+                                }}
+                            >
+                                Завершить попытку
+                            </button>
+                        </>
+
+
+                    ) : trainingSet.tasks.length === 0 ? (
+                        <p>В наборе нет заданий.</p>
+                    ) : (
+                        <p>Задание не найдено. Выберите другое из списка.</p>
+                    )}
+                </>
             )}
         </main>
     );
