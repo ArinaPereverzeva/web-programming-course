@@ -19,7 +19,23 @@ export default function App() {
         submitted: false
     });
 
+    const cleanAnswer = (taskId: string) => {
+        setAttempt((previousAttempt) =>
+            clearAnswer(previousAttempt, taskId)
+        );
+    };
+
+    const finishAttempt = () => {
+        setAttempt((previousAttempt) => submitAttempt(previousAttempt));
+    };
+
     const [showReview, setShowReview] = useState(false);
+
+    const restart = () => {
+        setAttempt({ answers: [], submitted: false });
+        setSelectedTaskId(trainingSet.tasks[0]?.id ?? null);
+        setShowReview(false);
+    };
 
     const answers = attempt.answers;
     const submitted = attempt.submitted;
@@ -78,14 +94,7 @@ export default function App() {
                     })}
                     <button
                         type="button"
-                        onClick={() => {
-                            setAttempt({
-                                answers: [],
-                                submitted: false
-                            });
-                            setSelectedTaskId(trainingSet.tasks[0]?.id ?? null);
-                            setShowReview(false);
-                        }}
+                        onClick={restart}
                     >
                         Начать новую попытку
                     </button>
@@ -126,11 +135,7 @@ export default function App() {
                                                 updateAnswer(previousAttempt, newAnswer)
                                             );
                                         }}
-                                        onClearAnswer={(taskId) => {
-                                            setAttempt((previousAttempt) =>
-                                                clearAnswer(previousAttempt, taskId)
-                                            );
-                                        }}
+                                        onClearAnswer={cleanAnswer}
                                     />
                                     <div>
                                         <button
@@ -178,7 +183,7 @@ export default function App() {
                                                 if (!confirmed) return;
                                             }
 
-                                            setAttempt((previousAttempt) => submitAttempt(previousAttempt));
+                                            finishAttempt();
                                         }}
                                     >
                                         Завершить попытку
@@ -222,11 +227,7 @@ export default function App() {
                                                 {answer && (
                                                     <button
                                                         type="button"
-                                                        onClick={() => {
-                                                            setAttempt((previousAttempt) =>
-                                                                clearAnswer(previousAttempt, task.id)
-                                                            );
-                                                        }}
+                                                        onClick={() => cleanAnswer(task.id)}
                                                     >
                                                         Очистить ответ
                                                     </button>
