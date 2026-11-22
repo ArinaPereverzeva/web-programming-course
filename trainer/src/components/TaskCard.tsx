@@ -1,4 +1,4 @@
-import type { Answer, Task } from "./domain";
+import type { Answer, Task } from "../domain";
 
 type TaskCardProps = {
   task: Task;
